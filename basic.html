@@ -346,28 +346,26 @@ body {
     let x, y;
 
     // ── Top-left corner ──
-    // If both adjacent edges are flat, go straight through the corner point (0,0).
-    // If only one is flat, the flat side contributes a straight boundary and the
-    // tabbed side still needs its corner offset.
     if (topFlat && leftFlat) {
-      x = 0; y = 0;
+      // Both flat. Left flat always "down" (inset).
+      x = hc; y = vc;
       d += `M ${x} ${y}`;
     } else if (topFlat) {
-      // Left edge is tabbed, top is flat. Start at (0, vc), go to corner (0, 0).
+      // Left is tabbed, top is flat. Stay at y=vc (no arm to y=0).
       if (leftLastDown) {
         x = hc; y = vc;
         d += `M ${x} ${y}`;
-        x = 0; d += ` L ${x} ${y}`;
       } else {
         x = 0; y = vc;
         d += `M ${x} ${y}`;
       }
-      y = 0; d += ` L ${x} ${y}`;
     } else if (leftFlat) {
-      // Top edge is tabbed, left is flat. Start at (0, 0), go to (hc, 0).
-      x = 0; y = 0;
+      // Top is tabbed, left is flat. Left always ends "down" (inset at x=hc).
+      x = hc; y = vc;
       d += `M ${x} ${y}`;
-      x = hc; d += ` L ${x} ${y}`;
+      if (!topFirstDown) {
+        y = 0; d += ` L ${x} ${y}`;
+      }
     } else {
       // Both tabbed — original corner logic
       if (leftLastDown) {
@@ -385,7 +383,11 @@ body {
 
     // ── Top edge ──
     if (topFlat) {
-      x = panelW; y = 0;
+      if (rightFlat || rightFirstDown) {
+        x = panelW - hc;
+      } else {
+        x = panelW;
+      }
       d += ` L ${x} ${y}`;
     } else {
       for (let i = 0; i < topSegs.length; i++) {
@@ -412,18 +414,15 @@ body {
 
     // ── Top-right corner ──
     if (topFlat && rightFlat) {
-      // Already at (panelW, 0), continue
+      // Both flat. Already at correct inset position.
     } else if (topFlat) {
-      // Top was flat, right is tabbed. At (panelW, 0), go to (panelW, vc).
-      y = vc; d += ` L ${x} ${y}`;
+      // Top was flat (at y=vc), right is tabbed. Already at correct position.
     } else if (rightFlat) {
-      // Top was tabbed, right is flat. Draw the top edge's corner arm, then
-      // move to the right boundary at vc. Do NOT return to y=0 — that would
-      // create a segment retraced by the flat right edge.
+      // Top was tabbed, right is flat. Right always starts "down" (inset).
+      // Don't draw arm to x=panelW.
       if (!topLastDown) {
         y = vc; d += ` L ${x} ${y}`;
       }
-      x = panelW; d += ` L ${x} ${y}`;
     } else {
       if (!topLastDown) {
         y = vc; d += ` L ${x} ${y}`;
@@ -435,7 +434,7 @@ body {
 
     // ── Right edge ──
     if (rightFlat) {
-      x = panelW; y = panelH;
+      x = panelW - hc; y = panelH - vc;
       d += ` L ${x} ${y}`;
     } else {
       for (let i = 0; i < rightSegs.length; i++) {
@@ -462,18 +461,17 @@ body {
 
     // ── Bottom-right corner ──
     if (rightFlat && bottomFlat) {
-      // Already at (panelW, panelH), continue
+      // Both flat. Already at correct inset position.
     } else if (rightFlat) {
-      // Right was flat, bottom is tabbed. At (panelW, panelH), go to (panelW - hc, panelH).
-      x = panelW - hc; d += ` L ${x} ${y}`;
+      // Right was flat (always ends "down"), bottom is tabbed.
+      if (!bottomFirstDown) {
+        y = panelH; d += ` L ${x} ${y}`;
+      }
     } else if (bottomFlat) {
-      // Right was tabbed, bottom is flat. Draw the right edge's corner arm, then
-      // move to the bottom boundary at panelW-hc. Do NOT return to x=panelW —
-      // that would create a segment retraced by the flat bottom edge.
+      // Right was tabbed, bottom is flat. Don't draw arm to y=panelH.
       if (!rightLastDown) {
         x = panelW - hc; d += ` L ${x} ${y}`;
       }
-      y = panelH; d += ` L ${x} ${y}`;
     } else {
       if (!rightLastDown) {
         x = panelW - hc; d += ` L ${x} ${y}`;
@@ -485,7 +483,11 @@ body {
 
     // ── Bottom edge ──
     if (bottomFlat) {
-      x = 0; y = panelH;
+      if (leftFlat || leftFirstDown) {
+        x = hc;
+      } else {
+        x = 0;
+      }
       d += ` L ${x} ${y}`;
     } else {
       for (let i = 0; i < bottomSegs.length; i++) {
@@ -512,18 +514,15 @@ body {
 
     // ── Bottom-left corner ──
     if (bottomFlat && leftFlat) {
-      // Already at (0, panelH), continue
+      // Both flat. Already at correct inset position.
     } else if (bottomFlat) {
-      // Bottom was flat, left is tabbed. At (0, panelH), go to (0, panelH - vc).
-      y = panelH - vc; d += ` L ${x} ${y}`;
+      // Bottom was flat (at y=panelH-vc). Already at correct position.
     } else if (leftFlat) {
-      // Bottom was tabbed, left is flat. Draw the bottom edge's corner arm, then
-      // move to the left boundary at panelH-vc. Do NOT return to y=panelH —
-      // that would create a segment retraced by the flat left edge (Z closure).
+      // Bottom was tabbed, left is flat. Left always starts "down" (inset).
+      // Don't draw arm to x=0.
       if (!bottomLastDown) {
         y = panelH - vc; d += ` L ${x} ${y}`;
       }
-      x = 0; d += ` L ${x} ${y}`;
     } else {
       if (!bottomLastDown) {
         y = panelH - vc; d += ` L ${x} ${y}`;
