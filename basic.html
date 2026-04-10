@@ -101,6 +101,41 @@ body {
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
+
+.page-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.download-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-btn:hover {
+  background: rgba(0,0,0,0.75);
+}
+
+.download-btn::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(45deg);
+  margin-top: -3px;
+}
 </style>
 </head>
 <body>
@@ -382,12 +417,13 @@ body {
       // Top was flat, right is tabbed. At (panelW, 0), go to (panelW, vc).
       y = vc; d += ` L ${x} ${y}`;
     } else if (rightFlat) {
-      // Top was tabbed, right is flat. Need to close corner to (panelW, 0).
+      // Top was tabbed, right is flat. Draw the top edge's corner arm, then
+      // move to the right boundary at vc. Do NOT return to y=0 — that would
+      // create a segment retraced by the flat right edge.
       if (!topLastDown) {
         y = vc; d += ` L ${x} ${y}`;
       }
       x = panelW; d += ` L ${x} ${y}`;
-      y = 0; d += ` L ${x} ${y}`;
     } else {
       if (!topLastDown) {
         y = vc; d += ` L ${x} ${y}`;
@@ -431,12 +467,13 @@ body {
       // Right was flat, bottom is tabbed. At (panelW, panelH), go to (panelW - hc, panelH).
       x = panelW - hc; d += ` L ${x} ${y}`;
     } else if (bottomFlat) {
-      // Right was tabbed, bottom is flat. Need to close corner to (panelW, panelH).
+      // Right was tabbed, bottom is flat. Draw the right edge's corner arm, then
+      // move to the bottom boundary at panelW-hc. Do NOT return to x=panelW —
+      // that would create a segment retraced by the flat bottom edge.
       if (!rightLastDown) {
         x = panelW - hc; d += ` L ${x} ${y}`;
       }
       y = panelH; d += ` L ${x} ${y}`;
-      x = panelW; d += ` L ${x} ${y}`;
     } else {
       if (!rightLastDown) {
         x = panelW - hc; d += ` L ${x} ${y}`;
@@ -480,12 +517,13 @@ body {
       // Bottom was flat, left is tabbed. At (0, panelH), go to (0, panelH - vc).
       y = panelH - vc; d += ` L ${x} ${y}`;
     } else if (leftFlat) {
-      // Bottom was tabbed, left is flat. Need to close corner to (0, panelH).
+      // Bottom was tabbed, left is flat. Draw the bottom edge's corner arm, then
+      // move to the left boundary at panelH-vc. Do NOT return to y=panelH —
+      // that would create a segment retraced by the flat left edge (Z closure).
       if (!bottomLastDown) {
         y = panelH - vc; d += ` L ${x} ${y}`;
       }
       x = 0; d += ` L ${x} ${y}`;
-      y = panelH; d += ` L ${x} ${y}`;
     } else {
       if (!bottomLastDown) {
         y = panelH - vc; d += ` L ${x} ${y}`;
@@ -762,6 +800,23 @@ body {
     return { contentW: maxX, contentH: maxY };
   }
 
+  function downloadSvg(svg, pageIndex) {
+    const clone = svg.cloneNode(true);
+    const texts = clone.querySelectorAll('text');
+    for (const t of texts) t.remove();
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(clone);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boxcutter-page-${pageIndex}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function render() {
     const v = getValues();
     const panels = generatePanels(v);
@@ -825,7 +880,18 @@ body {
         }
       }
 
-      output.appendChild(svg);
+      const wrapper = document.createElement('div');
+      wrapper.classList.add('page-wrapper');
+      wrapper.appendChild(svg);
+
+      const btn = document.createElement('button');
+      btn.classList.add('download-btn');
+      btn.title = 'Download SVG';
+      const pageIndex = pages.indexOf(page) + 1;
+      btn.addEventListener('click', () => downloadSvg(svg, pageIndex));
+      wrapper.appendChild(btn);
+
+      output.appendChild(wrapper);
     }
   }
 
