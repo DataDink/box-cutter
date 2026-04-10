@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>box cutter</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+#controls {
+  width: 260px;
+  min-width: 260px;
+  padding: 20px;
+  background: #16213e;
+  overflow-y: auto;
+  border-right: 1px solid #0f3460;
+}
+
+#controls h1 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #e94560;
+  letter-spacing: 1px;
+}
+
+.control-group {
+  margin-bottom: 20px;
+}
+
+.control-group h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #a0a0b8;
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #0f3460;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.control-row label {
+  font-size: 13px;
+  color: #c0c0d0;
+}
+
+.control-row input[type="number"] {
+  width: 80px;
+  padding: 4px 8px;
+  background: #0f3460;
+  border: 1px solid #1a4080;
+  color: #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: right;
+}
+
+.control-row input[type="number"]:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+.control-row input[type="checkbox"] {
+  accent-color: #e94560;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+#output {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 16px;
+}
+
+.svg-page {
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+</style>
+</head>
+<body>
+<div id="controls">
+  <h1>box cutter</h1>
+
+  <div class="control-group">
+    <h2>Page</h2>
+    <div class="control-row">
+      <label>Width (mm)</label>
+      <input type="number" id="pageWidth" min="1" value="300">
+    </div>
+    <div class="control-row">
+      <label>Height (mm)</label>
+      <input type="number" id="pageHeight" min="1" value="300">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Box Dimensions</h2>
+    <div class="control-row">
+      <label>Width (mm)</label>
+      <input type="number" id="boxWidth" min="1" value="100">
+    </div>
+    <div class="control-row">
+      <label>Height (mm)</label>
+      <input type="number" id="boxHeight" min="1" value="100">
+    </div>
+    <div class="control-row">
+      <label>Depth (mm)</label>
+      <input type="number" id="boxDepth" min="1" value="100">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Tab Dimensions</h2>
+    <div class="control-row">
+      <label>Length (mm)</label>
+      <input type="number" id="tabLength" min="1" value="10">
+    </div>
+    <div class="control-row">
+      <label>Depth (mm)</label>
+      <input type="number" id="tabDepth" min="0.1" step="0.1" value="3">
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Sides</h2>
+    <div class="control-row">
+      <label>Top</label>
+      <input type="checkbox" id="sideTop" checked>
+    </div>
+    <div class="control-row">
+      <label>Bottom</label>
+      <input type="checkbox" id="sideBottom" checked>
+    </div>
+    <div class="control-row">
+      <label>Front</label>
+      <input type="checkbox" id="sideFront" checked>
+    </div>
+    <div class="control-row">
+      <label>Back</label>
+      <input type="checkbox" id="sideBack" checked>
+    </div>
+    <div class="control-row">
+      <label>Left</label>
+      <input type="checkbox" id="sideLeft" checked>
+    </div>
+    <div class="control-row">
+      <label>Right</label>
+      <input type="checkbox" id="sideRight" checked>
+    </div>
+  </div>
+</div>
+<div id="output"></div>
+
+<script>
+(function() {
+  const MM_TO_PX = 72 / 25.4;
+
+  const inputs = {
+    pageWidth: document.getElementById('pageWidth'),
+    pageHeight: document.getElementById('pageHeight'),
+    boxWidth: document.getElementById('boxWidth'),
+    boxHeight: document.getElementById('boxHeight'),
+    boxDepth: document.getElementById('boxDepth'),
+    tabLength: document.getElementById('tabLength'),
+    tabDepth: document.getElementById('tabDepth'),
+  };
+
+  const sideInputs = {
+    Top: document.getElementById('sideTop'),
+    Bottom: document.getElementById('sideBottom'),
+    Front: document.getElementById('sideFront'),
+    Back: document.getElementById('sideBack'),
+    Left: document.getElementById('sideLeft'),
+    Right: document.getElementById('sideRight'),
+  };
+
+  const STORAGE_KEY = 'boxcutter_settings';
+
+  function loadSettings() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        for (const key in data) {
+          if (inputs[key]) inputs[key].value = data[key];
+          if (sideInputs[key] !== undefined) sideInputs[key].checked = data[key];
+        }
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    const data = {};
+    for (const key in inputs) {
+      data[key] = parseFloat(inputs[key].value);
+    }
+    for (const key in sideInputs) {
+      data[key] = sideInputs[key].checked;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function getValues() {
+    const sides = new Set();
+    for (const key in sideInputs) {
+      if (sideInputs[key].checked) sides.add(key);
+    }
+    return {
+      pageW: parseFloat(inputs.pageWidth.value) || 300,
+      pageH: parseFloat(inputs.pageHeight.value) || 300,
+      boxW: parseFloat(inputs.boxWidth.value) || 100,
+      boxH: parseFloat(inputs.boxHeight.value) || 100,
+      boxD: parseFloat(inputs.boxDepth.value) || 100,
+      tabLen: parseFloat(inputs.tabLength.value) || 10,
+      tabDep: parseFloat(inputs.tabDepth.value) || 3,
+      sides,
+    };
+  }
+
+  // Generate the edge segments for one edge of a given length.
+  // startsUp: whether the first tab after the corner is "up" (protruding inward).
+  // Returns an array of { type: 'tab', length: number, up: boolean }
+  function generateEdgeSegments(edgeLength, tabLen, tabDep, startsUp) {
+    const segments = [];
+    const available = edgeLength - 2 * tabDep;
+    if (available <= 0) return segments;
+
+    let remaining = available;
+    let isUp = startsUp;
+    while (remaining > 0) {
+      const len = Math.min(tabLen, remaining);
+      segments.push({ type: 'tab', length: len, up: isUp });
+      isUp = !isUp;
+      remaining -= len;
+    }
+
+    return segments;
+  }
+
+  // Build a closed SVG path for a single box panel.
+  // edges: [top, right, bottom, left] each with { length, startsUp }
+  // panelW, panelH: the outer dimensions of the panel in mm.
+  function buildPanelPath(panelW, panelH, edges, tabLen, tabDep) {
+    // edges[0] = top edge (left to right)
+    // edges[1] = right edge (top to bottom)
+    // edges[2] = bottom edge (right to left)
+    // edges[3] = left edge (bottom to top)
+    // Each edge has { startsUp, flat }. Flat edges are straight lines, no tabs/corners.
+
+    const allFlat = edges.every(e => e.flat);
+
+    // Degenerate case: dimension too small for tabs, or all edges flat — simple rectangle
+    if (allFlat || panelW <= 2 * tabDep || panelH <= 2 * tabDep) {
+      return `M 0 0 L ${panelW} 0 L ${panelW} ${panelH} L 0 ${panelH} Z`;
+    }
+
+    const topFlat = edges[0].flat;
+    const rightFlat = edges[1].flat;
+    const bottomFlat = edges[2].flat;
+    const leftFlat = edges[3].flat;
+
+    const topSegs = topFlat ? [] : generateEdgeSegments(panelW, tabLen, tabDep, edges[0].startsUp);
+    const rightSegs = rightFlat ? [] : generateEdgeSegments(panelH, tabLen, tabDep, edges[1].startsUp);
+    const bottomSegs = bottomFlat ? [] : generateEdgeSegments(panelW, tabLen, tabDep, edges[2].startsUp).reverse();
+    const leftSegs = leftFlat ? [] : generateEdgeSegments(panelH, tabLen, tabDep, edges[3].startsUp).reverse();
+
+    const hc = tabDep;
+    const vc = tabDep;
+
+    // When a "down" (slot) segment is adjacent to a corner L-shape, one line
+    // of the slot dip retraces one line of the corner. Pre-compute which
+    // first/last segments are "down" so we can skip the overlapping corner arm.
+    const topFirstDown = topSegs.length > 0 && !topSegs[0].up;
+    const topLastDown = topSegs.length > 0 && !topSegs[topSegs.length - 1].up;
+    const rightFirstDown = rightSegs.length > 0 && !rightSegs[0].up;
+    const rightLastDown = rightSegs.length > 0 && !rightSegs[rightSegs.length - 1].up;
+    const bottomFirstDown = bottomSegs.length > 0 && !bottomSegs[0].up;
+    const bottomLastDown = bottomSegs.length > 0 && !bottomSegs[bottomSegs.length - 1].up;
+    const leftFirstDown = leftSegs.length > 0 && !leftSegs[0].up;
+    const leftLastDown = leftSegs.length > 0 && !leftSegs[leftSegs.length - 1].up;
+
+    let d = '';
+    let x, y;
+
+    // ── Top-left corner ──
+    // If both adjacent edges are flat, go straight through the corner point (0,0).
+    // If only one is flat, the flat side contributes a straight boundary and the
+    // tabbed side still needs its corner offset.
+    if (topFlat && leftFlat) {
+      x = 0; y = 0;
+      d += `M ${x} ${y}`;
+    } else if (topFlat) {
+      // Left edge is tabbed, top is flat. Start at (0, vc), go to corner (0, 0).
+      if (leftLastDown) {
+        x = hc; y = vc;
+        d += `M ${x} ${y}`;
+        x = 0; d += ` L ${x} ${y}`;
+      } else {
+        x = 0; y = vc;
+        d += `M ${x} ${y}`;
+      }
+      y = 0; d += ` L ${x} ${y}`;
+    } else if (leftFlat) {
+      // Top edge is tabbed, left is flat. Start at (0, 0), go to (hc, 0).
+      x = 0; y = 0;
+      d += `M ${x} ${y}`;
+      x = hc; d += ` L ${x} ${y}`;
+    } else {
+      // Both tabbed — original corner logic
+      if (leftLastDown) {
+        x = hc; y = vc;
+        d += `M ${x} ${y}`;
+      } else {
+        x = 0; y = vc;
+        d += `M ${x} ${y}`;
+        x = hc; d += ` L ${x} ${y}`;
+      }
+      if (!topFirstDown) {
+        y = 0; d += ` L ${x} ${y}`;
+      }
+    }
+
+    // ── Top edge ──
+    if (topFlat) {
+      x = panelW; y = 0;
+      d += ` L ${x} ${y}`;
+    } else {
+      for (let i = 0; i < topSegs.length; i++) {
+        const seg = topSegs[i];
+        if (seg.up) {
+          x += seg.length;
+          d += ` L ${x} ${y}`;
+        } else {
+          const skipDip = (i === 0) && topFirstDown && !leftFlat;
+          const skipReturn = (i === topSegs.length - 1) && topLastDown;
+          if (!skipDip) {
+            d += ` L ${x} ${tabDep}`;
+          }
+          x += seg.length;
+          d += ` L ${x} ${tabDep}`;
+          if (!skipReturn) {
+            y = 0; d += ` L ${x} ${y}`;
+          } else {
+            y = vc;
+          }
+        }
+      }
+    }
+
+    // ── Top-right corner ──
+    if (topFlat && rightFlat) {
+      // Already at (panelW, 0), continue
+    } else if (topFlat) {
+      // Top was flat, right is tabbed. At (panelW, 0), go to (panelW, vc).
+      y = vc; d += ` L ${x} ${y}`;
+    } else if (rightFlat) {
+      // Top was tabbed, right is flat. Need to close corner to (panelW, 0).
+      if (!topLastDown) {
+        y = vc; d += ` L ${x} ${y}`;
+      }
+      x = panelW; d += ` L ${x} ${y}`;
+      y = 0; d += ` L ${x} ${y}`;
+    } else {
+      if (!topLastDown) {
+        y = vc; d += ` L ${x} ${y}`;
+      }
+      if (!rightFirstDown) {
+        x = panelW; d += ` L ${x} ${y}`;
+      }
+    }
+
+    // ── Right edge ──
+    if (rightFlat) {
+      x = panelW; y = panelH;
+      d += ` L ${x} ${y}`;
+    } else {
+      for (let i = 0; i < rightSegs.length; i++) {
+        const seg = rightSegs[i];
+        if (seg.up) {
+          y += seg.length;
+          d += ` L ${x} ${y}`;
+        } else {
+          const skipDip = (i === 0) && rightFirstDown && !topFlat;
+          const skipReturn = (i === rightSegs.length - 1) && rightLastDown;
+          if (!skipDip) {
+            d += ` L ${panelW - tabDep} ${y}`;
+          }
+          y += seg.length;
+          d += ` L ${panelW - tabDep} ${y}`;
+          if (!skipReturn) {
+            x = panelW; d += ` L ${x} ${y}`;
+          } else {
+            x = panelW - hc;
+          }
+        }
+      }
+    }
+
+    // ── Bottom-right corner ──
+    if (rightFlat && bottomFlat) {
+      // Already at (panelW, panelH), continue
+    } else if (rightFlat) {
+      // Right was flat, bottom is tabbed. At (panelW, panelH), go to (panelW - hc, panelH).
+      x = panelW - hc; d += ` L ${x} ${y}`;
+    } else if (bottomFlat) {
+      // Right was tabbed, bottom is flat. Need to close corner to (panelW, panelH).
+      if (!rightLastDown) {
+        x = panelW - hc; d += ` L ${x} ${y}`;
+      }
+      y = panelH; d += ` L ${x} ${y}`;
+      x = panelW; d += ` L ${x} ${y}`;
+    } else {
+      if (!rightLastDown) {
+        x = panelW - hc; d += ` L ${x} ${y}`;
+      }
+      if (!bottomFirstDown) {
+        y = panelH; d += ` L ${x} ${y}`;
+      }
+    }
+
+    // ── Bottom edge ──
+    if (bottomFlat) {
+      x = 0; y = panelH;
+      d += ` L ${x} ${y}`;
+    } else {
+      for (let i = 0; i < bottomSegs.length; i++) {
+        const seg = bottomSegs[i];
+        if (seg.up) {
+          x -= seg.length;
+          d += ` L ${x} ${y}`;
+        } else {
+          const skipDip = (i === 0) && bottomFirstDown && !rightFlat;
+          const skipReturn = (i === bottomSegs.length - 1) && bottomLastDown;
+          if (!skipDip) {
+            d += ` L ${x} ${panelH - tabDep}`;
+          }
+          x -= seg.length;
+          d += ` L ${x} ${panelH - tabDep}`;
+          if (!skipReturn) {
+            y = panelH; d += ` L ${x} ${y}`;
+          } else {
+            y = panelH - vc;
+          }
+        }
+      }
+    }
+
+    // ── Bottom-left corner ──
+    if (bottomFlat && leftFlat) {
+      // Already at (0, panelH), continue
+    } else if (bottomFlat) {
+      // Bottom was flat, left is tabbed. At (0, panelH), go to (0, panelH - vc).
+      y = panelH - vc; d += ` L ${x} ${y}`;
+    } else if (leftFlat) {
+      // Bottom was tabbed, left is flat. Need to close corner to (0, panelH).
+      if (!bottomLastDown) {
+        y = panelH - vc; d += ` L ${x} ${y}`;
+      }
+      x = 0; d += ` L ${x} ${y}`;
+      y = panelH; d += ` L ${x} ${y}`;
+    } else {
+      if (!bottomLastDown) {
+        y = panelH - vc; d += ` L ${x} ${y}`;
+      }
+      if (!leftFirstDown) {
+        x = 0; d += ` L ${x} ${y}`;
+      }
+    }
+
+    // ── Left edge ──
+    if (leftFlat) {
+      // Go straight up to the start point
+    } else {
+      for (let i = 0; i < leftSegs.length; i++) {
+        const seg = leftSegs[i];
+        if (seg.up) {
+          y -= seg.length;
+          d += ` L ${x} ${y}`;
+        } else {
+          const skipDip = (i === 0) && leftFirstDown && !bottomFlat;
+          const skipReturn = (i === leftSegs.length - 1) && leftLastDown;
+          if (!skipDip) {
+            d += ` L ${tabDep} ${y}`;
+          }
+          y -= seg.length;
+          d += ` L ${tabDep} ${y}`;
+          if (!skipReturn) {
+            x = 0; d += ` L ${x} ${y}`;
+          } else {
+            x = hc;
+          }
+        }
+      }
+    }
+
+    d += ' Z';
+    return d;
+  }
+
+  // Define the 6 box sides and their edge tab patterns.
+  // Each side has 4 edges [top, right, bottom, left].
+  // For interlocking: if side A's edge starts up, the matching edge on side B starts down.
+  //
+  // Box faces:
+  //   Top:    W x D
+  //   Bottom: W x D
+  //   Front:  W x H
+  //   Back:   W x H
+  //   Left:   D x H
+  //   Right:  D x H
+  //
+  // Interlocking pairs (shared edges):
+  //   Top-Front:    top's bottom edge <-> front's top edge (width W)
+  //   Top-Back:     top's top edge <-> back's top edge (width W)
+  //   Top-Left:     top's left edge <-> left's top edge (depth D)
+  //   Top-Right:    top's right edge <-> right's top edge (depth D)
+  //   Bottom-Front: bottom's top edge <-> front's bottom edge (width W)
+  //   Bottom-Back:  bottom's bottom edge <-> back's bottom edge (width W)
+  //   Bottom-Left:  bottom's left edge <-> left's bottom edge (depth D)
+  //   Bottom-Right: bottom's right edge <-> right's bottom edge (depth D)
+  //   Front-Left:   front's left edge <-> left's right edge (height H)
+  //   Front-Right:  front's right edge <-> right's left edge (height H)
+  //   Back-Left:    back's right edge <-> left's left edge (height H)
+  //   Back-Right:   back's left edge <-> right's right edge (height H)
+
+  function generatePanels(v) {
+    const { boxW, boxH, boxD, tabLen, tabDep, sides } = v;
+
+    // We define "startsUp" for each edge of each face.
+    // Convention: first tab after corner is "up" (true) or "down" (false).
+    // We pick a consistent assignment and ensure matching edges are inverted.
+    // "partner" identifies the interlocking side for each edge — if the partner
+    // is disabled, the edge is drawn flat (no tabs).
+
+    const panels = [
+      {
+        name: 'Top',
+        w: boxW,
+        h: boxD,
+        edges: [
+          { startsUp: true, partner: 'Back' },    // top edge
+          { startsUp: true, partner: 'Right' },   // right edge
+          { startsUp: true, partner: 'Front' },   // bottom edge
+          { startsUp: true, partner: 'Left' },    // left edge
+        ],
+      },
+      {
+        name: 'Bottom',
+        w: boxW,
+        h: boxD,
+        edges: [
+          { startsUp: true, partner: 'Front' },   // top edge
+          { startsUp: true, partner: 'Right' },   // right edge
+          { startsUp: true, partner: 'Back' },    // bottom edge
+          { startsUp: true, partner: 'Left' },    // left edge
+        ],
+      },
+      {
+        name: 'Front',
+        w: boxW,
+        h: boxH,
+        edges: [
+          { startsUp: false, partner: 'Top' },    // top edge
+          { startsUp: true, partner: 'Right' },   // right edge
+          { startsUp: false, partner: 'Bottom' }, // bottom edge
+          { startsUp: true, partner: 'Left' },    // left edge
+        ],
+      },
+      {
+        name: 'Back',
+        w: boxW,
+        h: boxH,
+        edges: [
+          { startsUp: false, partner: 'Top' },    // top edge
+          { startsUp: true, partner: 'Left' },    // right edge [back is flipped perspective]
+          { startsUp: false, partner: 'Bottom' }, // bottom edge
+          { startsUp: true, partner: 'Right' },   // left edge [back is flipped]
+        ],
+      },
+      {
+        name: 'Left',
+        w: boxD,
+        h: boxH,
+        edges: [
+          { startsUp: false, partner: 'Top' },    // top edge
+          { startsUp: false, partner: 'Front' },  // right edge
+          { startsUp: false, partner: 'Bottom' }, // bottom edge
+          { startsUp: false, partner: 'Back' },   // left edge
+        ],
+      },
+      {
+        name: 'Right',
+        w: boxD,
+        h: boxH,
+        edges: [
+          { startsUp: false, partner: 'Top' },    // top edge
+          { startsUp: false, partner: 'Back' },   // right edge
+          { startsUp: false, partner: 'Bottom' }, // bottom edge
+          { startsUp: false, partner: 'Front' },  // left edge
+        ],
+      },
+    ];
+
+    return panels
+      .filter(p => sides.has(p.name))
+      .map(p => ({
+        name: p.name,
+        w: p.w,
+        h: p.h,
+        path: buildPanelPath(p.w, p.h, p.edges.map(e => ({
+          startsUp: e.startsUp,
+          flat: !sides.has(e.partner),
+        })), tabLen, tabDep),
+      }));
+  }
+
+  // Pack panels into pages using a row-based greedy packing algorithm.
+  // Panels can be rotated 90 degrees. Padding between panels, no padding at borders.
+  function packPanels(panels, pageW, pageH, padding) {
+    // For each panel, consider both orientations
+    const items = panels.map(p => ({
+      name: p.name,
+      w: p.w,
+      h: p.h,
+      path: p.path,
+      rotated: false,
+    }));
+
+    // Sort by tallest first for better packing
+    items.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h));
+
+    const pages = [];
+
+    function tryPlaceOnPageWithOrient(page, item, orient) {
+      // Try to place in existing rows
+      for (const row of page.rows) {
+        const x = row.currentX;
+        const y = row.y;
+        if (x + orient.w <= pageW && orient.h <= row.height) {
+          row.items.push({
+            ...item,
+            x,
+            y,
+            placedW: orient.w,
+            placedH: orient.h,
+            rotated: orient.rotated,
+          });
+          row.currentX = x + orient.w + padding;
+          return true;
+        }
+      }
+
+      // Try to start a new row
+      const rowY = page.rows.length === 0 ? 0 : page.rows[page.rows.length - 1].y + page.rows[page.rows.length - 1].height + padding;
+      if (rowY + orient.h <= pageH && orient.w <= pageW) {
+        const row = {
+          y: rowY,
+          height: orient.h,
+          currentX: orient.w + padding,
+          items: [{
+            ...item,
+            x: 0,
+            y: rowY,
+            placedW: orient.w,
+            placedH: orient.h,
+            rotated: orient.rotated,
+          }],
+        };
+        page.rows.push(row);
+        return true;
+      }
+
+      return false;
+    }
+
+    for (const item of items) {
+      let placed = false;
+      // Nesting: for each orientation → for each page → try rows/new row
+      const orientations = [
+        { w: item.w, h: item.h, rotated: false },
+        { w: item.h, h: item.w, rotated: true },
+      ];
+
+      for (const orient of orientations) {
+        if (placed) break;
+        for (const page of pages) {
+          if (tryPlaceOnPageWithOrient(page, item, orient)) {
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          const newPage = { rows: [] };
+          if (tryPlaceOnPageWithOrient(newPage, item, orient)) {
+            pages.push(newPage);
+            placed = true;
+          }
+        }
+      }
+
+      if (!placed) {
+        // Panel is larger than page in both orientations — force-place
+        const orient = item.w <= pageW ? { w: item.w, h: item.h, rotated: false } : { w: item.h, h: item.w, rotated: true };
+        const forcePage = {
+          rows: [{
+            y: 0,
+            height: orient.h,
+            currentX: orient.w + padding,
+            items: [{
+              ...item,
+              x: 0,
+              y: 0,
+              placedW: orient.w,
+              placedH: orient.h,
+              rotated: orient.rotated,
+            }],
+          }],
+        };
+        pages.push(forcePage);
+      }
+    }
+
+    return pages;
+  }
+
+  function computePageBounds(page) {
+    let maxX = 0, maxY = 0;
+    for (const row of page.rows) {
+      for (const item of row.items) {
+        maxX = Math.max(maxX, item.x + item.placedW);
+        maxY = Math.max(maxY, item.y + item.placedH);
+      }
+    }
+    return { contentW: maxX, contentH: maxY };
+  }
+
+  function render() {
+    const v = getValues();
+    const panels = generatePanels(v);
+    const pages = packPanels(panels, v.pageW, v.pageH, 5);
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    const pageWpx = v.pageW * MM_TO_PX;
+    const pageHpx = v.pageH * MM_TO_PX;
+
+    for (const page of pages) {
+      const { contentW, contentH } = computePageBounds(page);
+
+      // Center offset
+      const offsetX = (v.pageW - contentW) / 2;
+      const offsetY = (v.pageH - contentH) / 2;
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', pageWpx.toFixed(2));
+      svg.setAttribute('height', pageHpx.toFixed(2));
+      svg.setAttribute('viewBox', `0 0 ${v.pageW} ${v.pageH}`);
+      svg.setAttribute('xmlns', svgNS);
+      svg.classList.add('svg-page');
+
+      for (const row of page.rows) {
+        for (const item of row.items) {
+          const g = document.createElementNS(svgNS, 'g');
+
+          let transform = `translate(${(item.x + offsetX).toFixed(4)}, ${(item.y + offsetY).toFixed(4)})`;
+          if (item.rotated) {
+            transform = `translate(${(item.x + offsetX).toFixed(4)}, ${(item.y + offsetY).toFixed(4)})`;
+            transform += ` translate(${(item.placedW / 2).toFixed(4)}, ${(item.placedH / 2).toFixed(4)})`;
+            transform += ` rotate(90)`;
+            transform += ` translate(${(-item.w / 2).toFixed(4)}, ${(-item.h / 2).toFixed(4)})`;
+          }
+
+          g.setAttribute('transform', transform);
+
+          const path = document.createElementNS(svgNS, 'path');
+          path.setAttribute('d', item.path);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', '#000');
+          path.setAttribute('stroke-width', '0.1');
+          g.appendChild(path);
+
+          // Label
+          const text = document.createElementNS(svgNS, 'text');
+          text.setAttribute('x', (item.w / 2).toFixed(2));
+          text.setAttribute('y', (item.h / 2).toFixed(2));
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dominant-baseline', 'middle');
+          text.setAttribute('font-size', '6');
+          text.setAttribute('fill', '#999');
+          text.setAttribute('font-family', 'sans-serif');
+          text.textContent = item.name;
+          g.appendChild(text);
+
+          svg.appendChild(g);
+        }
+      }
+
+      output.appendChild(svg);
+    }
+  }
+
+  loadSettings();
+
+  for (const key in inputs) {
+    inputs[key].addEventListener('input', () => {
+      saveSettings();
+      render();
+    });
+  }
+
+  for (const key in sideInputs) {
+    sideInputs[key].addEventListener('change', () => {
+      saveSettings();
+      render();
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
