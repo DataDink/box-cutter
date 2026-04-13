@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SVG Stub Page (no real content)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  body {
+    display: flex; flex-direction: column; height: 100vh;
+    background: #1a1a1a; color: #ddd;
+  }
+  header {
+    padding: 0.75rem 1rem; background: #0d0d0d; color: #fff;
+    border-bottom: 1px solid #333;
+  }
+  header h1 { margin: 0; font-size: 1.1rem; font-weight: 500; }
+  main { display: flex; flex: 1; min-height: 0; }
+  aside {
+    width: 280px; padding: 1rem; overflow-y: auto;
+    background: #222; border-right: 1px solid #333;
+  }
+  article {
+    flex: 1; padding: 1rem; overflow: auto;
+    display: flex; flex-flow: row wrap; align-content: flex-start; gap: 0.5rem;
+    background: #1a1a1a;
+  }
+  article > * { flex: 0 0 auto; }
+  .svg-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+  .svg-item button.download {
+    padding: 0.25rem 0.6rem; font-size: 0.75rem;
+    border: 1px solid #555; background: #2a2a2a; color: #eee;
+    border-radius: 3px; cursor: pointer;
+  }
+  .svg-item button.download:hover { background: #3a3a3a; border-color: #6af; }
+  .field { display: flex; flex-direction: column; margin-bottom: 0.5rem; }
+  .field label { font-size: 0.8rem; color: #aaa; margin-bottom: 0.15rem; }
+  .field input[type="text"], .field input[type="number"] {
+    padding: 0.3rem; border: 1px solid #444; border-radius: 3px;
+    background: #111; color: #eee;
+  }
+  .field input[type="text"]:focus, .field input[type="number"]:focus {
+    outline: none; border-color: #6af;
+  }
+  .field input[type="checkbox"] { accent-color: #6af; }
+  .field.check { flex-direction: row; align-items: center; gap: 0.4rem; }
+  .field.check label { margin: 0; }
+  .group {
+    border: 1px solid #333; border-radius: 4px;
+    padding: 0.5rem; margin-bottom: 0.5rem; background: #1a1a1a;
+  }
+  .group > .group-label {
+    font-size: 0.75rem; text-transform: uppercase;
+    color: #888; margin-bottom: 0.3rem;
+  }
+  button.action {
+    width: 100%; padding: 0.4rem; margin-bottom: 0.3rem;
+    border: 1px solid #555; background: #2a2a2a; color: #eee;
+    border-radius: 3px; cursor: pointer;
+  }
+  button.action:hover { background: #3a3a3a; border-color: #6af; }
+</style>
+</head>
+<body>
+<header><h1></h1></header>
+<main>
+  <aside id="inputs"></aside>
+  <article id="output"></article>
+</main>
+<script>
+(() => {
+  document.querySelector('header h1').textContent = document.title;
+
+  const STORAGE_KEY = 'svg-stub:' + location.pathname;
+  const DEBOUNCE_MS = 1000;
+
+  // ---- Configure your page here ------------------------------------------
+  const defaults = {
+    width: 400,
+    height: 400,
+    label: 'hello',
+    filled: true,
+    style: {
+      stroke: '#000',
+      strokeWidth: 1,
+    },
+    randomize: () => {
+      // Example action: mutate a value then re-run.
+      const el = document.querySelector('[name="label"]');
+      if (el) { el.value = Math.random().toString(36).slice(2, 8); triggerInput(el); }
+    },
+  };
+
+  async function generate(values) {
+    // Stub: replace with real SVG generation.
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', values.width);
+    svg.setAttribute('height', values.height);
+    svg.setAttribute('viewBox', `0 0 ${values.width} ${values.height}`);
+
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', 10);
+    rect.setAttribute('y', 10);
+    rect.setAttribute('width', values.width - 20);
+    rect.setAttribute('height', values.height - 20);
+    rect.setAttribute('fill', values.filled ? '#cce' : 'none');
+    rect.setAttribute('stroke', values.style.stroke);
+    rect.setAttribute('stroke-width', values.style.strokeWidth);
+    svg.appendChild(rect);
+
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', values.width / 2);
+    text.setAttribute('y', values.height / 2);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.textContent = values.label;
+    svg.appendChild(text);
+
+    return svg;
+  }
+  // ------------------------------------------------------------------------
+
+  const saved = loadSaved();
+  const state = mergeState(defaults, saved);
+
+  const inputsEl = document.getElementById('inputs');
+  const outputEl = document.getElementById('output');
+  buildInputs(defaults, state, inputsEl, []);
+
+  function loadSaved() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function persist() {
+    const copy = stripFns(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(copy));
+  }
+  function stripFns(obj) {
+    const out = {};
+    for (const k in obj) {
+      const v = obj[k];
+      if (typeof v === 'function') continue;
+      if (v && typeof v === 'object' && !Array.isArray(v)) out[k] = stripFns(v);
+      else out[k] = v;
+    }
+    return out;
+  }
+  function mergeState(defs, saved) {
+    const out = {};
+    for (const k in defs) {
+      const d = defs[k];
+      if (typeof d === 'function') { out[k] = d; continue; }
+      if (d && typeof d === 'object' && !Array.isArray(d)) {
+        out[k] = mergeState(d, saved && saved[k] || {});
+      } else if (saved && k in saved && typeof saved[k] === typeof d) {
+        out[k] = saved[k];
+      } else {
+        out[k] = d;
+      }
+    }
+    return out;
+  }
+
+  function buildInputs(defs, stateNode, parent, path) {
+    for (const key in defs) {
+      const defVal = defs[key];
+      const t = typeof defVal;
+      if (t === 'function') {
+        const btn = document.createElement('button');
+        btn.className = 'action';
+        btn.type = 'button';
+        btn.textContent = key;
+        btn.addEventListener('click', () => defVal(stateNode, state));
+        parent.appendChild(btn);
+      } else if (defVal && t === 'object' && !Array.isArray(defVal)) {
+        const group = document.createElement('div');
+        group.className = 'group';
+        const lbl = document.createElement('div');
+        lbl.className = 'group-label';
+        lbl.textContent = key;
+        group.appendChild(lbl);
+        buildInputs(defVal, stateNode[key], group, path.concat(key));
+        parent.appendChild(group);
+      } else {
+        parent.appendChild(makeField(key, stateNode, path));
+      }
+    }
+  }
+
+  function makeField(key, stateNode, path) {
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    const val = stateNode[key];
+    const t = typeof val;
+    const input = document.createElement('input');
+    input.name = path.concat(key).join('.');
+
+    const label = document.createElement('label');
+    label.textContent = key;
+    label.htmlFor = input.name;
+    input.id = input.name;
+
+    if (t === 'number') {
+      input.type = 'number';
+      input.value = val;
+      input.addEventListener('input', () => {
+        const n = input.valueAsNumber;
+        if (!Number.isNaN(n)) { stateNode[key] = n; onChange(); }
+      });
+      wrap.appendChild(label); wrap.appendChild(input);
+    } else if (t === 'boolean') {
+      wrap.classList.add('check');
+      input.type = 'checkbox';
+      input.checked = val;
+      input.addEventListener('input', () => {
+        stateNode[key] = input.checked; onChange();
+      });
+      wrap.appendChild(input); wrap.appendChild(label);
+    } else {
+      input.type = 'text';
+      input.value = val;
+      input.addEventListener('input', () => {
+        stateNode[key] = input.value; onChange();
+      });
+      wrap.appendChild(label); wrap.appendChild(input);
+    }
+    return wrap;
+  }
+
+  function triggerInput(el) {
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  let debounceTimer = null;
+  let runId = 0;
+  let running = false;
+
+  function onChange() {
+    persist();
+    scheduleRun();
+  }
+  function scheduleRun() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runGenerate, DEBOUNCE_MS);
+  }
+
+  async function runGenerate() {
+    const myId = ++runId;
+    running = true;
+    try {
+      const result = await generate(snapshot(state));
+      if (myId !== runId) return; // a newer input fired — discard
+      outputEl.replaceChildren();
+      const svgs = [];
+      if (result instanceof DocumentFragment) {
+        svgs.push(...result.querySelectorAll('svg'));
+      } else if (result instanceof SVGElement) {
+        svgs.push(result);
+      }
+      for (const svg of svgs) outputEl.appendChild(wrapSvg(svg));
+    } finally {
+      running = false;
+    }
+  }
+  function wrapSvg(svg) {
+    const wrap = document.createElement('div');
+    wrap.className = 'svg-item';
+    wrap.appendChild(svg);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'download';
+    btn.textContent = 'Download SVG';
+    btn.addEventListener('click', () => downloadSvg(svg));
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function downloadSvg(svg) {
+    const clone = svg.cloneNode(true);
+    if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const MM_PER_IN = 25.4, DPI = 72;
+    const toPx = mm => (parseFloat(mm) * DPI) / MM_PER_IN;
+    const w = parseFloat(svg.getAttribute('width'));
+    const h = parseFloat(svg.getAttribute('height'));
+    if (!clone.getAttribute('viewBox') && !Number.isNaN(w) && !Number.isNaN(h)) {
+      clone.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    }
+    if (!Number.isNaN(w)) clone.setAttribute('width', toPx(w));
+    if (!Number.isNaN(h)) clone.setAttribute('height', toPx(h));
+    const source = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + source], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.title || 'image').replace(/\s+/g, '-').toLowerCase() + '-' + Date.now() + '.svg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function snapshot(obj) {
+    const out = {};
+    for (const k in obj) {
+      const v = obj[k];
+      if (typeof v === 'function') continue;
+      if (v && typeof v === 'object' && !Array.isArray(v)) out[k] = snapshot(v);
+      else out[k] = v;
+    }
+    return out;
+  }
+
+  // Kick off an initial render.
+  runGenerate();
+
+  // Expose for debugging.
+  window.__stub = { state, defaults, generate: runGenerate };
+})();
+</script>
+</body>
+</html>
